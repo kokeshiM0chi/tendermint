@@ -2,14 +2,15 @@
 FROM golang:1.15-alpine as builder
 RUN apk update && \
     apk upgrade && \
-    apk --no-cache add make
+#    apk --no-cache add make
+    apk add --no-cache git make gcc libc-dev build-base curl jq bash file gmp-dev clang libtool autoconf automake
 COPY / /tendermint
 WORKDIR /tendermint
 RUN make build-linux
 
 # stage 2
 FROM golang:1.15-alpine
-LABEL maintainer="hello@tendermint.com"
+LABEL maintainer="hello@blockchain.line.me"
 
 # Tendermint will be looking for the genesis file in /tendermint/config/genesis.json
 # (unless you change `genesis_file` in config.toml). You can put your config.toml and
@@ -25,9 +26,12 @@ ENV TMHOME /tendermint
 # could execute bash commands.
 RUN apk update && \
     apk upgrade && \
-    apk --no-cache add curl jq bash && \
-    addgroup tmuser && \
-    adduser -S -G tmuser tmuser -h "$TMHOME"
+    apk add --no-cache git make gcc libc-dev build-base curl jq bash file gmp-dev clang libtool autoconf automake && \
+#    apk --no-cache add curl jq bash && \
+#    addgroup tmuser && \
+#    adduser -S -G tmuser tmuser -h "$TMHOME"
+    addgroup --g 503 tmuser && \
+    adduser -S -G tmuser --uid 503 tmuser -h "$TMHOME"
 
 # Run the container with tmuser by default. (UID=100, GID=1000)
 USER tmuser

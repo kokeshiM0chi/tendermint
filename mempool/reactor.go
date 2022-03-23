@@ -175,6 +175,14 @@ func (memR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 	}
 	memR.Logger.Debug("Receive", "src", src, "chId", chID, "msg", msg)
 
+	// mymemo gossip protocol reactor
+	labels := []string{
+		"peer_id", string(src.ID()),
+		"chID", fmt.Sprintf("%#x", MempoolChannel),
+		"msgType", "TxsMessage",
+	}
+	memR.mempool.metrics.MemReactorReceiveMessage.With(labels...).Add(1)
+
 	txInfo := TxInfo{SenderID: memR.ids.GetForPeer(src)}
 	if src != nil {
 		txInfo.SenderP2PID = src.ID()
@@ -256,6 +264,13 @@ func (memR *Reactor) broadcastTxRoutine(peer p2p.Peer) {
 				time.Sleep(peerCatchupSleepIntervalMS * time.Millisecond)
 				continue
 			}
+			// mymemo gossip protocol
+			labels := []string{
+				"peer_id", string(peer.ID()),
+				"chID", fmt.Sprintf("%#x", MempoolChannel),
+				"msgType", "TxsMessage",
+			}
+			memR.mempool.metrics.MemReactorSendMessage.With(labels...).Add(1)
 		}
 
 		select {

@@ -85,7 +85,7 @@ type MConnection struct {
 	send          chan struct{}
 	pong          chan struct{}
 	channels      []*Channel
-	channelsIdx   map[byte]*Channel
+	ChannelsIdx   map[byte]*Channel
 	onReceive     receiveCbFunc
 	onError       errorCbFunc
 	errored       uint32
@@ -198,7 +198,7 @@ func NewMConnectionWithConfig(
 		channels = append(channels, channel)
 	}
 	mconn.channels = channels
-	mconn.channelsIdx = channelsIdx
+	mconn.ChannelsIdx = channelsIdx
 
 	mconn.BaseService = *service.NewBaseService(nil, "MConnection", mconn)
 
@@ -355,7 +355,7 @@ func (c *MConnection) Send(chID byte, msgBytes []byte) bool {
 	c.Logger.Debug("Send", "channel", chID, "conn", c, "msgBytes", fmt.Sprintf("%X", msgBytes))
 
 	// Send message to channel.
-	channel, ok := c.channelsIdx[chID]
+	channel, ok := c.ChannelsIdx[chID]
 	if !ok {
 		c.Logger.Error(fmt.Sprintf("Cannot send bytes, unknown channel %X", chID))
 		return false
@@ -384,7 +384,7 @@ func (c *MConnection) TrySend(chID byte, msgBytes []byte) bool {
 	c.Logger.Debug("TrySend", "channel", chID, "conn", c, "msgBytes", fmt.Sprintf("%X", msgBytes))
 
 	// Send message to channel.
-	channel, ok := c.channelsIdx[chID]
+	channel, ok := c.ChannelsIdx[chID]
 	if !ok {
 		c.Logger.Error(fmt.Sprintf("Cannot send bytes, unknown channel %X", chID))
 		return false
@@ -409,7 +409,7 @@ func (c *MConnection) CanSend(chID byte) bool {
 		return false
 	}
 
-	channel, ok := c.channelsIdx[chID]
+	channel, ok := c.ChannelsIdx[chID]
 	if !ok {
 		c.Logger.Error(fmt.Sprintf("Unknown channel %X", chID))
 		return false
@@ -624,7 +624,7 @@ FOR_LOOP:
 				// never block
 			}
 		case *tmp2p.Packet_PacketMsg:
-			channel, ok := c.channelsIdx[byte(pkt.PacketMsg.ChannelID)]
+			channel, ok := c.ChannelsIdx[byte(pkt.PacketMsg.ChannelID)]
 			if !ok || channel == nil {
 				err := fmt.Errorf("unknown channel %X", pkt.PacketMsg.ChannelID)
 				c.Logger.Debug("Connection failed @ recvRoutine", "conn", c, "err", err)
@@ -705,7 +705,7 @@ func (c *MConnection) Status() ConnectionStatus {
 	for i, channel := range c.channels {
 		status.Channels[i] = ChannelStatus{
 			ID:                channel.desc.ID,
-			SendQueueCapacity: cap(channel.sendQueue),
+			SendQueueCapacity: cap(channel.SendQueue),
 			SendQueueSize:     int(atomic.LoadInt32(&channel.sendQueueSize)),
 			Priority:          channel.desc.Priority,
 			RecentlySent:      atomic.LoadInt64(&channel.recentlySent),
@@ -743,7 +743,7 @@ func (chDesc ChannelDescriptor) FillDefaults() (filled ChannelDescriptor) {
 type Channel struct {
 	conn          *MConnection
 	desc          ChannelDescriptor
-	sendQueue     chan []byte
+	SendQueue     chan []byte
 	sendQueueSize int32 // atomic.
 	recving       []byte
 	sending       []byte
@@ -762,7 +762,7 @@ func newChannel(conn *MConnection, desc ChannelDescriptor) *Channel {
 	return &Channel{
 		conn:                    conn,
 		desc:                    desc,
-		sendQueue:               make(chan []byte, desc.SendQueueCapacity),
+		SendQueue:               make(chan []byte, desc.SendQueueCapacity),
 		recving:                 make([]byte, 0, desc.RecvBufferCapacity),
 		maxPacketMsgPayloadSize: conn.config.MaxPacketMsgPayloadSize,
 	}
@@ -777,7 +777,7 @@ func (ch *Channel) SetLogger(l log.Logger) {
 // Times out (and returns false) after defaultSendTimeout
 func (ch *Channel) sendBytes(bytes []byte) bool {
 	select {
-	case ch.sendQueue <- bytes:
+	case ch.SendQueue <- bytes:
 		atomic.AddInt32(&ch.sendQueueSize, 1)
 		return true
 	case <-time.After(defaultSendTimeout):
@@ -790,7 +790,7 @@ func (ch *Channel) sendBytes(bytes []byte) bool {
 // Goroutine-safe
 func (ch *Channel) trySendBytes(bytes []byte) bool {
 	select {
-	case ch.sendQueue <- bytes:
+	case ch.SendQueue <- bytes:
 		atomic.AddInt32(&ch.sendQueueSize, 1)
 		return true
 	default:
@@ -814,10 +814,10 @@ func (ch *Channel) canSend() bool {
 // Goroutine-safe
 func (ch *Channel) isSendPending() bool {
 	if len(ch.sending) == 0 {
-		if len(ch.sendQueue) == 0 {
+		if len(ch.SendQueue) == 0 {
 			return false
 		}
-		ch.sending = <-ch.sendQueue
+		ch.sending = <-ch.SendQueue
 	}
 	return true
 }

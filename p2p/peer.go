@@ -252,12 +252,16 @@ func (p *peer) Send(chID byte, msgBytes []byte) bool {
 		return false
 	}
 	res := p.mconn.Send(chID, msgBytes)
+	channel := p.mconn.ChannelsIdx[chID]
 	if res {
 		labels := []string{
 			"peer_id", string(p.ID()),
 			"chID", fmt.Sprintf("%#x", chID),
 		}
+		p.metrics.SendQueueSize.With(labels...).Set(float64(len(channel.SendQueue)))
+
 		p.metrics.PeerSendBytesTotal.With(labels...).Add(float64(len(msgBytes)))
+		p.metrics.NumSendingMessagesOnPeer.With(labels...).Add(1)
 	}
 	return res
 }
@@ -276,6 +280,7 @@ func (p *peer) TrySend(chID byte, msgBytes []byte) bool {
 			"peer_id", string(p.ID()),
 			"chID", fmt.Sprintf("%#x", chID),
 		}
+		p.metrics.NumSendingMessagesOnPeer.With(labels...).Add(1)
 		p.metrics.PeerSendBytesTotal.With(labels...).Add(float64(len(msgBytes)))
 	}
 	return res
@@ -387,6 +392,8 @@ func createMConnection(
 			"chID", fmt.Sprintf("%#x", chID),
 		}
 		p.metrics.PeerReceiveBytesTotal.With(labels...).Add(float64(len(msgBytes)))
+		p.metrics.NumRecievingMessagesOnPeer.With(labels...).Add(1)
+		// mymemo decode msg, record message for each message type
 		reactor.Receive(chID, p, msgBytes)
 	}
 

@@ -18,12 +18,24 @@ const (
 type Metrics struct {
 	// Size of the mempool.
 	Size metrics.Gauge
+
+	SizeInUpdate metrics.Gauge
+	// Size of the mempool in the globalCb function
+	SizeInGlobalCb metrics.Gauge
+	// Size of the mempool in the reqResCb function
+	SizeInReqResCb metrics.Gauge
+	//
+	SizeOfCacheInUpdate  metrics.Gauge
+	SizeOfCacheInCheckTx metrics.Gauge
 	// Histogram of transaction sizes, in bytes.
 	TxSizeBytes metrics.Histogram
 	// Number of failed transactions.
 	FailedTxs metrics.Counter
 	// Number of times transactions are rechecked in the mempool.
 	RecheckTimes metrics.Counter
+	//-----mymemo investigate gossip protocol------
+	MemReactorSendMessage    metrics.Gauge
+	MemReactorReceiveMessage metrics.Gauge
 }
 
 // PrometheusMetrics returns Metrics build using Prometheus client library.
@@ -40,6 +52,36 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 			Subsystem: MetricsSubsystem,
 			Name:      "size",
 			Help:      "Size of the mempool (number of uncommitted transactions).",
+		}, labels).With(labelsAndValues...),
+		SizeInUpdate: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "size_in_update",
+			Help:      "Size of the mempool in Update (number of uncommitted transactions).",
+		}, labels).With(labelsAndValues...),
+		SizeInReqResCb: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "size_in_reqResCb",
+			Help:      "Size of the mempool in reqResCb (number of uncommitted transactions).",
+		}, labels).With(labelsAndValues...),
+		SizeOfCacheInUpdate: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "size_cache_in_update",
+			Help:      "Size of the chache in Update.",
+		}, labels).With(labelsAndValues...),
+		SizeOfCacheInCheckTx: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "size_cache_in_checkTx",
+			Help:      "Size of the chache in CheckTX.",
+		}, labels).With(labelsAndValues...),
+		SizeInGlobalCb: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "size_in_globalCb",
+			Help:      "Size of the mempool in globalCb (number of uncommitted transactions).",
 		}, labels).With(labelsAndValues...),
 		TxSizeBytes: prometheus.NewHistogramFrom(stdprometheus.HistogramOpts{
 			Namespace: namespace,
@@ -66,9 +108,14 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 // NopMetrics returns no-op Metrics.
 func NopMetrics() *Metrics {
 	return &Metrics{
-		Size:         discard.NewGauge(),
-		TxSizeBytes:  discard.NewHistogram(),
-		FailedTxs:    discard.NewCounter(),
-		RecheckTimes: discard.NewCounter(),
+		Size:                 discard.NewGauge(),
+		SizeInUpdate:         discard.NewGauge(),
+		SizeInReqResCb:       discard.NewGauge(),
+		SizeInGlobalCb:       discard.NewGauge(),
+		SizeOfCacheInUpdate:  discard.NewGauge(),
+		SizeOfCacheInCheckTx: discard.NewGauge(),
+		TxSizeBytes:          discard.NewHistogram(),
+		FailedTxs:            discard.NewCounter(),
+		RecheckTimes:         discard.NewCounter(),
 	}
 }

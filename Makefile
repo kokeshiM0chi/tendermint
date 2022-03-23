@@ -201,15 +201,14 @@ sync-docs:
 ###############################################################################
 
 build-docker: build-linux
-	cp $(OUTPUT) DOCKER/tendermint
-	docker build --label=tendermint --tag="tendermint/tendermint" DOCKER
-	rm -rf DOCKER/tendermint
+# 	cp $(OUTPUT) DOCKER/tendermint
+	docker build --label=tendermint --tag="tendermint/tendermint" -f ./DOCKER/Dockerfile .
+# 	rm -rf DOCKER/tendermint
 .PHONY: build-docker
 
 ###############################################################################
 ###                       Local testnet using docker                        ###
 ###############################################################################
-
 # Build linux binary on other platforms
 build-linux:
 	GOOS=linux GOARCH=amd64 $(MAKE) build

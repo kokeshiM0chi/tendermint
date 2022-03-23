@@ -25,6 +25,15 @@ type Metrics struct {
 	PeerPendingSendBytes metrics.Gauge
 	// Number of transactions submitted by each peer.
 	NumTxs metrics.Gauge
+
+	//=====================
+	// mymemo gossip protocol
+
+	NumSendingMessagesOnPeer   metrics.Gauge
+	NumRecievingMessagesOnPeer metrics.Gauge
+	SendQueueSize              metrics.Gauge
+
+	//=====================
 }
 
 // PrometheusMetrics returns Metrics build using Prometheus client library.

@@ -22,7 +22,7 @@ const (
 	LogFormatJSON = "json"
 
 	// DefaultLogLevel defines a default log level as INFO.
-	DefaultLogLevel = "info"
+	DefaultLogLevel = "error"
 )
 
 // NOTE: Most of the structs & relevant comments + the
@@ -671,7 +671,7 @@ func DefaultMempoolConfig() *MempoolConfig {
 		// ABCI Recheck
 		Size:        5000,
 		MaxTxsBytes: 1024 * 1024 * 1024, // 1GB
-		CacheSize:   10000,
+		CacheSize:   50000,
 		MaxTxBytes:  1024 * 1024, // 1MB
 	}
 }

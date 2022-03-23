@@ -260,10 +260,45 @@ func (conR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 				return
 			}
 			ps.ApplyNewRoundStepMessage(msg)
+			// =====================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", StateChannel),
+					"msgType", "NewRoundStepMessage",
+					"RoundStepType", fmt.Sprintf("%d", msg.Step),
+				}
+				conR.Metrics.NumReceiveNewRoundStepMessageOnConReactor.With(labels...).Add(1)
+			}
+			// =====================
 		case *NewValidBlockMessage:
 			ps.ApplyNewValidBlockMessage(msg)
+			// =====================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", StateChannel),
+					"msgType", "NewValidBlockMessage",
+				}
+				conR.Metrics.NumReceiveNewValidBlockMessageOnConReactor.With(labels...).Add(1)
+			}
+			// =====================
 		case *HasVoteMessage:
 			ps.ApplyHasVoteMessage(msg)
+			// =====================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", StateChannel),
+					"msgType", "HasVoteMessage",
+					"voteType", fmt.Sprintf("%d", msg.Type),
+				}
+				conR.Metrics.NumReceiveHasVoteMessageOnConReactor.With(labels...).Add(1)
+			}
+			// =====================
 		case *VoteSetMaj23Message:
 			cs := conR.conS
 			cs.mtx.Lock()
@@ -284,6 +319,18 @@ func (conR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 			switch msg.Type {
 			case tmproto.PrevoteType:
 				ourVotes = votes.Prevotes(msg.Round).BitArrayByBlockID(msg.BlockID)
+				// =====================
+				// mymemo gossip protocol reactor
+				for _, peer := range conR.Switch.Peers().List() {
+					labels := []string{
+						"peer_id", string(peer.ID()),
+						"chID", fmt.Sprintf("%#x", StateChannel),
+						"msgType", "VoteSetMaj23Message(PrevoteType)",
+						"voteType", fmt.Sprintf("%d", msg.Type),
+					}
+					conR.Metrics.NumReceiveVoteSetMaj23MessageOnConReactor.With(labels...).Add(1)
+				}
+				//======================
 			case tmproto.PrecommitType:
 				ourVotes = votes.Precommits(msg.Round).BitArrayByBlockID(msg.BlockID)
 			default:
@@ -309,12 +356,45 @@ func (conR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 		case *ProposalMessage:
 			ps.SetHasProposal(msg.Proposal)
 			conR.conS.peerMsgQueue <- msgInfo{msg, src.ID()}
+			// =====================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", DataChannel),
+					"msgType", "ProposalMessage",
+					"voteType", fmt.Sprintf("%d", msg.Proposal.Type),
+				}
+				conR.Metrics.NumReceiveProposalMessageOnConReactor.With(labels...).Add(1)
+			}
+			//======================
 		case *ProposalPOLMessage:
 			ps.ApplyProposalPOLMessage(msg)
+			// =====================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", DataChannel),
+					"msgType", "ProposalPOLMessage",
+				}
+				conR.Metrics.NumReceiveProposalPOLMessageOnConReactor.With(labels...).Add(1)
+			}
+			//======================
 		case *BlockPartMessage:
 			ps.SetHasProposalBlockPart(msg.Height, msg.Round, int(msg.Part.Index))
 			conR.Metrics.BlockParts.With("peer_id", string(src.ID())).Add(1)
 			conR.conS.peerMsgQueue <- msgInfo{msg, src.ID()}
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", DataChannel),
+					"msgType", "BlockPartMessage",
+				}
+				conR.Metrics.NumReceiveBlockPartMessageOnConReactor.With(labels...).Add(1)
+			}
+			//======================
 		default:
 			conR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
 		}
@@ -333,6 +413,17 @@ func (conR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 			ps.EnsureVoteBitArrays(height, valSize)
 			ps.EnsureVoteBitArrays(height-1, lastCommitSize)
 			ps.SetHasVote(msg.Vote)
+			//======================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", VoteChannel),
+					"msgType", "VoteMessage",
+				}
+				conR.Metrics.NumReceiveVoteMessageOnConReactor.With(labels...).Add(1)
+			}
+			//======================
 
 			cs.peerMsgQueue <- msgInfo{msg, src.ID()}
 
@@ -428,6 +519,18 @@ func (conR *Reactor) unsubscribeFromBroadcastEvents() {
 func (conR *Reactor) broadcastNewRoundStepMessage(rs *cstypes.RoundState) {
 	nrsMsg := makeRoundStepMessage(rs)
 	conR.Switch.Broadcast(StateChannel, MustEncode(nrsMsg))
+	// =====================
+	// mymemo gossip protocol reactor
+	for _, peer := range conR.Switch.Peers().List() {
+		labels := []string{
+			"peer_id", string(peer.ID()),
+			"chID", fmt.Sprintf("%#x", StateChannel),
+			"msgType", "NewRoundStepMessage",
+			"RoundStepType", fmt.Sprintf("%d", rs.Step),
+		}
+		conR.Metrics.NumBroadcastNewRoundStepMessageOnConReactor.With(labels...).Add(1)
+	}
+	// =====================
 }
 
 func (conR *Reactor) broadcastNewValidBlockMessage(rs *cstypes.RoundState) {
@@ -439,6 +542,17 @@ func (conR *Reactor) broadcastNewValidBlockMessage(rs *cstypes.RoundState) {
 		IsCommit:           rs.Step == cstypes.RoundStepCommit,
 	}
 	conR.Switch.Broadcast(StateChannel, MustEncode(csMsg))
+	// =====================
+	// mymemo gossip protocol reactor
+	for _, peer := range conR.Switch.Peers().List() {
+		labels := []string{
+			"peer_id", string(peer.ID()),
+			"chID", fmt.Sprintf("%#x", StateChannel),
+			"msgType", "NewValidBlockMessage",
+		}
+		conR.Metrics.NumBroadcastNewValidBlockMessageOnConReactor.With(labels...).Add(1)
+	}
+	// =====================
 }
 
 // Broadcasts HasVoteMessage to peers that care.
@@ -450,6 +564,18 @@ func (conR *Reactor) broadcastHasVoteMessage(vote *types.Vote) {
 		Index:  vote.ValidatorIndex,
 	}
 	conR.Switch.Broadcast(StateChannel, MustEncode(msg))
+	// =========
+	// mymemo gossip protocol reactor
+	for _, peer := range conR.Switch.Peers().List() {
+		labels := []string{
+			"peer_id", string(peer.ID()),
+			"chID", fmt.Sprintf("%#x", StateChannel),
+			"msgType", "HasVoteMessage",
+			"voteType", fmt.Sprintf("%d", vote.Type),
+		}
+		conR.Metrics.NumBroadcastHasVoteMessageOnConReactor.With(labels...).Add(1)
+	}
+	//=========
 	/*
 		// TODO: Make this broadcast more selective.
 		for _, peer := range conR.Switch.Peers().List() {
@@ -512,6 +638,17 @@ OUTER_LOOP:
 				logger.Debug("Sending block part", "height", prs.Height, "round", prs.Round)
 				if peer.Send(DataChannel, MustEncode(msg)) {
 					ps.SetHasProposalBlockPart(prs.Height, prs.Round, index)
+					// =========
+					// mymemo gossip protocol reactor
+					for _, peer := range conR.Switch.Peers().List() {
+						labels := []string{
+							"peer_id", string(peer.ID()),
+							"chID", fmt.Sprintf("%#x", DataChannel),
+							"msgType", "BlockPartMessage",
+						}
+						conR.Metrics.NumSendBlockPartMessageOnConReactor.With(labels...).Add(1)
+					}
+					//=========
 				}
 				continue OUTER_LOOP
 			}
@@ -561,7 +698,20 @@ OUTER_LOOP:
 				if peer.Send(DataChannel, MustEncode(msg)) {
 					// NOTE[ZM]: A peer might have received different proposal msg so this Proposal msg will be rejected!
 					ps.SetHasProposal(rs.Proposal)
+					// =========
+					// mymemo gossip protocol reactor
+					for _, peer := range conR.Switch.Peers().List() {
+						labels := []string{
+							"peer_id", string(peer.ID()),
+							"chID", fmt.Sprintf("%#x", DataChannel),
+							"msgType", "ProposalMessage",
+							"voteType", fmt.Sprintf("%d", msg.Proposal.Type),
+						}
+						conR.Metrics.NumSendProposalMessageOnConReactor.With(labels...).Add(1)
+					}
+					//=========
 				}
+
 			}
 			// ProposalPOL: lets peer know which POL votes we have so far.
 			// Peer must receive ProposalMessage first.
@@ -574,7 +724,20 @@ OUTER_LOOP:
 					ProposalPOL:      rs.Votes.Prevotes(rs.Proposal.POLRound).BitArray(),
 				}
 				logger.Debug("Sending POL", "height", prs.Height, "round", prs.Round)
-				peer.Send(DataChannel, MustEncode(msg))
+				success := peer.Send(DataChannel, MustEncode(msg))
+				if success {
+					// =====================
+					// mymemo gossip protocol reactor
+					for _, peer := range conR.Switch.Peers().List() {
+						labels := []string{
+							"peer_id", string(peer.ID()),
+							"chID", fmt.Sprintf("%#x", DataChannel),
+							"msgType", "ProposalPOLMessage",
+						}
+						conR.Metrics.NumSendProposalPOLMessageOnConReactor.With(labels...).Add(1)
+					}
+					//======================
+				}
 			}
 			continue OUTER_LOOP
 		}
@@ -666,6 +829,17 @@ OUTER_LOOP:
 		// If peer is lagging by height 1, send LastCommit.
 		if prs.Height != 0 && rs.Height == prs.Height+1 {
 			if ps.PickSendVote(rs.LastCommit) {
+				//======================
+				// mymemo gossip protocol reactor
+				for _, peer := range conR.Switch.Peers().List() {
+					labels := []string{
+						"peer_id", string(peer.ID()),
+						"chID", fmt.Sprintf("%#x", VoteChannel),
+						"msgType", "LastCommit",
+					}
+					conR.Metrics.NumSendVoteMessageOnConReactor.With(labels...).Add(1)
+				}
+				//======================
 				logger.Debug("Picked rs.LastCommit to send", "height", prs.Height)
 				continue OUTER_LOOP
 			}
@@ -680,6 +854,17 @@ OUTER_LOOP:
 			if commit := conR.conS.blockStore.LoadBlockCommit(prs.Height); commit != nil {
 				if ps.PickSendVote(commit) {
 					logger.Debug("Picked Catchup commit to send", "height", prs.Height)
+					//======================
+					// mymemo gossip protocol reactor
+					for _, peer := range conR.Switch.Peers().List() {
+						labels := []string{
+							"peer_id", string(peer.ID()),
+							"chID", fmt.Sprintf("%#x", VoteChannel),
+							"msgType", "Commit",
+						}
+						conR.Metrics.NumSendVoteMessageOnConReactor.With(labels...).Add(1)
+					}
+					//======================
 					continue OUTER_LOOP
 				}
 			}
@@ -712,6 +897,18 @@ func (conR *Reactor) gossipVotesForHeight(
 	if prs.Step == cstypes.RoundStepNewHeight {
 		if ps.PickSendVote(rs.LastCommit) {
 			logger.Debug("Picked rs.LastCommit to send")
+			//======================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", VoteChannel),
+					"roundStepType", fmt.Sprintf("%d", cstypes.RoundStepNewHeight),
+					"msgType", "LastCommit",
+				}
+				conR.Metrics.NumSendVotesForHeightMessageOnConReactor.With(labels...).Add(1)
+			}
+			//======================
 			return true
 		}
 	}
@@ -721,6 +918,18 @@ func (conR *Reactor) gossipVotesForHeight(
 			if ps.PickSendVote(polPrevotes) {
 				logger.Debug("Picked rs.Prevotes(prs.ProposalPOLRound) to send",
 					"round", prs.ProposalPOLRound)
+				//======================
+				// mymemo gossip protocol reactor
+				for _, peer := range conR.Switch.Peers().List() {
+					labels := []string{
+						"peer_id", string(peer.ID()),
+						"chID", fmt.Sprintf("%#x", VoteChannel),
+						"roundStepType", fmt.Sprintf("%d", cstypes.RoundStepPropose),
+						"msgType", "polPrevotes",
+					}
+					conR.Metrics.NumSendVotesForHeightMessageOnConReactor.With(labels...).Add(1)
+				}
+				//======================
 				return true
 			}
 		}
@@ -729,6 +938,18 @@ func (conR *Reactor) gossipVotesForHeight(
 	if prs.Step <= cstypes.RoundStepPrevoteWait && prs.Round != -1 && prs.Round <= rs.Round {
 		if ps.PickSendVote(rs.Votes.Prevotes(prs.Round)) {
 			logger.Debug("Picked rs.Prevotes(prs.Round) to send", "round", prs.Round)
+			//======================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", VoteChannel),
+					"roundStepType", fmt.Sprintf("%d", cstypes.RoundStepPrevoteWait),
+					"msgType", "Prevotes",
+				}
+				conR.Metrics.NumSendVotesForHeightMessageOnConReactor.With(labels...).Add(1)
+			}
+			//======================
 			return true
 		}
 	}
@@ -736,6 +957,18 @@ func (conR *Reactor) gossipVotesForHeight(
 	if prs.Step <= cstypes.RoundStepPrecommitWait && prs.Round != -1 && prs.Round <= rs.Round {
 		if ps.PickSendVote(rs.Votes.Precommits(prs.Round)) {
 			logger.Debug("Picked rs.Precommits(prs.Round) to send", "round", prs.Round)
+			//======================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", VoteChannel),
+					"roundStepType", fmt.Sprintf("%d", cstypes.RoundStepPrecommitWait),
+					"msgType", "Precommits",
+				}
+				conR.Metrics.NumSendVotesForHeightMessageOnConReactor.With(labels...).Add(1)
+			}
+			//======================
 			return true
 		}
 	}
@@ -743,6 +976,18 @@ func (conR *Reactor) gossipVotesForHeight(
 	if prs.Round != -1 && prs.Round <= rs.Round {
 		if ps.PickSendVote(rs.Votes.Prevotes(prs.Round)) {
 			logger.Debug("Picked rs.Prevotes(prs.Round) to send", "round", prs.Round)
+			//======================
+			// mymemo gossip protocol reactor
+			for _, peer := range conR.Switch.Peers().List() {
+				labels := []string{
+					"peer_id", string(peer.ID()),
+					"chID", fmt.Sprintf("%#x", VoteChannel),
+					"roundStepType", fmt.Sprintf("%d", prs.Step),
+					"msgType", "Prevotes",
+				}
+				conR.Metrics.NumSendVotesForHeightMessageOnConReactor.With(labels...).Add(1)
+			}
+			//======================
 			return true
 		}
 	}
@@ -752,6 +997,18 @@ func (conR *Reactor) gossipVotesForHeight(
 			if ps.PickSendVote(polPrevotes) {
 				logger.Debug("Picked rs.Prevotes(prs.ProposalPOLRound) to send",
 					"round", prs.ProposalPOLRound)
+				//======================
+				// mymemo gossip protocol reactor
+				for _, peer := range conR.Switch.Peers().List() {
+					labels := []string{
+						"peer_id", string(peer.ID()),
+						"chID", fmt.Sprintf("%#x", VoteChannel),
+						"roundStepType", fmt.Sprintf("%d", prs.Step),
+						"msgType", "polPrevotes",
+					}
+					conR.Metrics.NumSendVotesForHeightMessageOnConReactor.With(labels...).Add(1)
+				}
+				//======================
 				return true
 			}
 		}
@@ -779,12 +1036,26 @@ OUTER_LOOP:
 			prs := ps.GetRoundState()
 			if rs.Height == prs.Height {
 				if maj23, ok := rs.Votes.Prevotes(prs.Round).TwoThirdsMajority(); ok {
-					peer.TrySend(StateChannel, MustEncode(&VoteSetMaj23Message{
+					success := peer.TrySend(StateChannel, MustEncode(&VoteSetMaj23Message{
 						Height:  prs.Height,
 						Round:   prs.Round,
 						Type:    tmproto.PrevoteType,
 						BlockID: maj23,
 					}))
+					if success {
+						// =====================
+						// mymemo gossip protocol reactor
+						for _, peer := range conR.Switch.Peers().List() {
+							labels := []string{
+								"peer_id", string(peer.ID()),
+								"chID", fmt.Sprintf("%#x", StateChannel),
+								"msgType", "VoteSetMaj23Message",
+								"voteType", fmt.Sprintf("%d", tmproto.PrevoteType),
+							}
+							conR.Metrics.NumSendVoteSetMaj23MessageOnConReactor.With(labels...).Add(1)
+						}
+						// =====================
+					}
 					time.Sleep(conR.conS.config.PeerQueryMaj23SleepDuration)
 				}
 			}
@@ -796,14 +1067,29 @@ OUTER_LOOP:
 			prs := ps.GetRoundState()
 			if rs.Height == prs.Height {
 				if maj23, ok := rs.Votes.Precommits(prs.Round).TwoThirdsMajority(); ok {
-					peer.TrySend(StateChannel, MustEncode(&VoteSetMaj23Message{
+					success := peer.TrySend(StateChannel, MustEncode(&VoteSetMaj23Message{
 						Height:  prs.Height,
 						Round:   prs.Round,
 						Type:    tmproto.PrecommitType,
 						BlockID: maj23,
 					}))
+					if success {
+						// =====================
+						// mymemo gossip protocol reactor
+						for _, peer := range conR.Switch.Peers().List() {
+							labels := []string{
+								"peer_id", string(peer.ID()),
+								"chID", fmt.Sprintf("%#x", StateChannel),
+								"msgType", "VoteSetMaj23Message",
+								"voteType", fmt.Sprintf("%d", tmproto.PrecommitType),
+							}
+							conR.Metrics.NumSendVoteSetMaj23MessageOnConReactor.With(labels...).Add(1)
+						}
+						// =====================
+					}
 					time.Sleep(conR.conS.config.PeerQueryMaj23SleepDuration)
 				}
+
 			}
 		}
 
@@ -813,12 +1099,26 @@ OUTER_LOOP:
 			prs := ps.GetRoundState()
 			if rs.Height == prs.Height && prs.ProposalPOLRound >= 0 {
 				if maj23, ok := rs.Votes.Prevotes(prs.ProposalPOLRound).TwoThirdsMajority(); ok {
-					peer.TrySend(StateChannel, MustEncode(&VoteSetMaj23Message{
+					success := peer.TrySend(StateChannel, MustEncode(&VoteSetMaj23Message{
 						Height:  prs.Height,
 						Round:   prs.ProposalPOLRound,
 						Type:    tmproto.PrevoteType,
 						BlockID: maj23,
 					}))
+					if success {
+						// =====================
+						// mymemo gossip protocol reactor
+						for _, peer := range conR.Switch.Peers().List() {
+							labels := []string{
+								"peer_id", string(peer.ID()),
+								"chID", fmt.Sprintf("%#x", StateChannel),
+								"msgType", "VoteSetMaj23Message",
+								"voteType", fmt.Sprintf("%d", tmproto.PrevoteType),
+							}
+							conR.Metrics.NumSendVoteSetMaj23MessageOnConReactor.With(labels...).Add(1)
+						}
+						// =====================
+					}
 					time.Sleep(conR.conS.config.PeerQueryMaj23SleepDuration)
 				}
 			}
@@ -833,12 +1133,26 @@ OUTER_LOOP:
 			if prs.CatchupCommitRound != -1 && prs.Height > 0 && prs.Height <= conR.conS.blockStore.Height() &&
 				prs.Height >= conR.conS.blockStore.Base() {
 				if commit := conR.conS.LoadCommit(prs.Height); commit != nil {
-					peer.TrySend(StateChannel, MustEncode(&VoteSetMaj23Message{
+					success := peer.TrySend(StateChannel, MustEncode(&VoteSetMaj23Message{
 						Height:  prs.Height,
 						Round:   commit.Round,
 						Type:    tmproto.PrecommitType,
 						BlockID: commit.BlockID,
 					}))
+					if success {
+						// =====================
+						// mymemo gossip protocol reactor
+						for _, peer := range conR.Switch.Peers().List() {
+							labels := []string{
+								"peer_id", string(peer.ID()),
+								"chID", fmt.Sprintf("%#x", StateChannel),
+								"msgType", "VoteSetMaj23Message",
+								"voteType", fmt.Sprintf("%d", tmproto.PrecommitType),
+							}
+							conR.Metrics.NumSendVoteSetMaj23MessageOnConReactor.With(labels...).Add(1)
+						}
+						// =====================
+					}
 					time.Sleep(conR.conS.config.PeerQueryMaj23SleepDuration)
 				}
 			}

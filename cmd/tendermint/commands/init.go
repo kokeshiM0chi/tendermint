@@ -37,6 +37,7 @@ func initFilesWithConfig(config *cfg.Config) error {
 	} else {
 		pv = privval.GenFilePV(privValKeyFile, privValStateFile)
 		pv.Save()
+		logger.Info("Tendermint Start")
 		logger.Info("Generated private validator", "keyFile", privValKeyFile,
 			"stateFile", privValStateFile)
 	}

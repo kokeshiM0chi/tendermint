@@ -237,7 +237,6 @@ func (mem *CListMempool) CheckTx(tx types.Tx, cb func(*abci.Response), txInfo Tx
 	defer mem.updateMtx.RUnlock()
 
 	txSize := len(tx)
-
 	if err := mem.isFull(txSize); err != nil {
 		return err
 	}
@@ -268,8 +267,12 @@ func (mem *CListMempool) CheckTx(tx types.Tx, cb func(*abci.Response), txInfo Tx
 	if err := mem.proxyAppConn.Error(); err != nil {
 		return err
 	}
+	var isNew = mem.cache.Push(tx)
+	mem.metrics.SizeOfCacheInCheckTx.Set(float64((mem.cache).(*mapTxCache).Size()))
 
-	if !mem.cache.Push(tx) {
+	if !isNew {
+		// enter this processing when the tx already exists in cache
+
 		// Record a new sender for a tx we've already seen.
 		// Note it's possible a tx is still in the cache but no longer in the mempool
 		// (eg. after committing a block, txs are removed from mempool but not cache),
@@ -284,7 +287,7 @@ func (mem *CListMempool) CheckTx(tx types.Tx, cb func(*abci.Response), txInfo Tx
 
 		return ErrTxInCache
 	}
-
+	// had already update
 	reqRes := mem.proxyAppConn.CheckTxAsync(abci.RequestCheckTx{Tx: tx})
 	reqRes.SetCallback(mem.reqResCb(tx, txInfo.SenderID, txInfo.SenderP2PID, cb))
 
@@ -309,7 +312,8 @@ func (mem *CListMempool) globalCb(req *abci.Request, res *abci.Response) {
 	mem.resCbRecheck(req, res)
 
 	// update metrics
-	mem.metrics.Size.Set(float64(mem.Size()))
+	//mem.metrics.Size.Set(float64(mem.Size()))
+	mem.metrics.SizeInGlobalCb.Set(float64(mem.Size()))
 }
 
 // Request specific callback that should be set on individual reqRes objects
@@ -336,7 +340,8 @@ func (mem *CListMempool) reqResCb(
 		mem.resCbFirstTime(tx, peerID, peerP2PID, res)
 
 		// update metrics
-		mem.metrics.Size.Set(float64(mem.Size()))
+		//mem.metrics.Size.Set(float64(mem.Size()))
+		mem.metrics.SizeInReqResCb.Set(float64(mem.Size()))
 
 		// passed in by the caller of CheckTx, eg. the RPC
 		if externalCb != nil {
@@ -411,10 +416,11 @@ func (mem *CListMempool) resCbFirstTime(
 			postCheckErr = mem.postCheck(tx, r.CheckTx)
 		}
 		if (r.CheckTx.Code == abci.CodeTypeOK) && postCheckErr == nil {
-			// Check mempool isn't full again to reduce the chance of exceeding the
-			// limits.
+			//Check mempool isn't full again to reduce the chance of exceeding the
+			//limits.
 			if err := mem.isFull(len(tx)); err != nil {
 				// remove from cache (mempool might have a space later)
+				// mymemo
 				mem.cache.Remove(tx)
 				mem.logger.Error(err.Error())
 				return
@@ -583,6 +589,7 @@ func (mem *CListMempool) Update(
 	if postCheck != nil {
 		mem.postCheck = postCheck
 	}
+	mem.metrics.SizeInUpdate.Set(float64(mem.Size()))
 
 	for i, tx := range txs {
 		if deliverTxResponses[i].Code == abci.CodeTypeOK {
@@ -592,6 +599,7 @@ func (mem *CListMempool) Update(
 			// Allow invalid transactions to be resubmitted.
 			mem.cache.Remove(tx)
 		}
+		mem.metrics.SizeOfCacheInUpdate.Set(float64(mem.cache.(*mapTxCache).Size()))
 
 		// Remove committed tx from the mempool.
 		//
@@ -701,6 +709,10 @@ func (cache *mapTxCache) Reset() {
 	cache.cacheMap = make(map[[TxKeySize]byte]*list.Element, cache.size)
 	cache.list.Init()
 	cache.mtx.Unlock()
+}
+
+func (cache *mapTxCache) Size() int {
+	return cache.size
 }
 
 // Push adds the given tx to the cache and returns true. It returns

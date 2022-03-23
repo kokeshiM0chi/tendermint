@@ -43,7 +43,7 @@ type Metrics struct {
 	ByzantineValidatorsPower metrics.Gauge
 
 	// Time between this and the last block.
-	BlockIntervalSeconds metrics.Histogram
+	BlockIntervalSeconds metrics.Gauge
 
 	// Number of transactions.
 	NumTxs metrics.Gauge
@@ -60,6 +60,25 @@ type Metrics struct {
 
 	// Number of blockparts transmitted by peer.
 	BlockParts metrics.Counter
+
+	//-----mymemo investigate gossip protocol------
+	NumReceiveHasVoteMessageOnConReactor         metrics.Gauge
+	NumBroadcastHasVoteMessageOnConReactor       metrics.Gauge
+	NumReceiveVoteSetMaj23MessageOnConReactor    metrics.Gauge
+	NumSendVoteSetMaj23MessageOnConReactor       metrics.Gauge
+	NumReceiveNewValidBlockMessageOnConReactor   metrics.Gauge
+	NumBroadcastNewValidBlockMessageOnConReactor metrics.Gauge
+	NumReceiveNewRoundStepMessageOnConReactor    metrics.Gauge
+	NumBroadcastNewRoundStepMessageOnConReactor  metrics.Gauge
+	NumReceiveProposalMessageOnConReactor        metrics.Gauge
+	NumSendProposalMessageOnConReactor           metrics.Gauge
+	NumReceiveProposalPOLMessageOnConReactor     metrics.Gauge
+	NumSendProposalPOLMessageOnConReactor        metrics.Gauge
+	NumReceiveBlockPartMessageOnConReactor       metrics.Gauge
+	NumSendBlockPartMessageOnConReactor          metrics.Gauge
+	NumReceiveVoteMessageOnConReactor            metrics.Gauge
+	NumSendVoteMessageOnConReactor               metrics.Gauge
+	NumSendVotesForHeightMessageOnConReactor     metrics.Gauge // gossipVotesForHeight in gossipVotesRoutine
 }
 
 // PrometheusMetrics returns Metrics build using Prometheus client library.
@@ -138,7 +157,7 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 			Name:      "byzantine_validators_power",
 			Help:      "Total power of the byzantine validators.",
 		}, labels).With(labelsAndValues...),
-		BlockIntervalSeconds: prometheus.NewHistogramFrom(stdprometheus.HistogramOpts{
+		BlockIntervalSeconds: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: MetricsSubsystem,
 			Name:      "block_interval_seconds",
@@ -186,6 +205,111 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 			Name:      "block_parts",
 			Help:      "Number of blockparts transmitted by peer.",
 		}, append(labels, "peer_id")).With(labelsAndValues...),
+		// ==========
+		// mymemo gossip protocol invstigation
+		NumBroadcastHasVoteMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_broadcast_hasvote_msgs_on_conreactor",
+			Help:      "Number of broadcast messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType", "voteType")).With(labelsAndValues...),
+		NumReceiveHasVoteMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_receiving_hasvote_msgs_on_conreactor",
+			Help:      "Number of receiving messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType", "voteType")).With(labelsAndValues...),
+		NumSendVoteSetMaj23MessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_sending_votesetmaj23_msgs_on_conreactor",
+			Help:      "Number of sending messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType", "voteType")).With(labelsAndValues...),
+		NumReceiveVoteSetMaj23MessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_receiving_votesetmaj23_msgs_on_conreactor",
+			Help:      "Number of receiving messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType", "voteType")).With(labelsAndValues...),
+		NumBroadcastNewValidBlockMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_broadcast_newvalidblock_msgs_on_conreactor",
+			Help:      "Number of broadcast messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType")).With(labelsAndValues...),
+		NumReceiveNewValidBlockMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_receiving_newvalidblock_msgs_on_conreactor",
+			Help:      "Number of receiving messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType")).With(labelsAndValues...),
+		NumBroadcastNewRoundStepMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_broadcast_newroundstep_msgs_on_conreactor",
+			Help:      "Number of broadcast messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType", "RoundStepType")).With(labelsAndValues...),
+		NumReceiveNewRoundStepMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_receiving_newroundstep_msgs_on_conreactor",
+			Help:      "Number of receiving messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType", "RoundStepType")).With(labelsAndValues...),
+		NumSendProposalMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_sending_proposal_msgs_on_conreactor",
+			Help:      "Number of sending messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType", "voteType")).With(labelsAndValues...),
+		NumReceiveProposalMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_receiving_proposal_msgs_on_conreactor",
+			Help:      "Number of receiving messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType", "voteType")).With(labelsAndValues...),
+		NumSendProposalPOLMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_sending_proposalpol_msgs_on_conreactor",
+			Help:      "Number of sending messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType")).With(labelsAndValues...),
+		NumReceiveProposalPOLMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_receiving_proposalpol_msgs_on_conreactor",
+			Help:      "Number of receiving messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType")).With(labelsAndValues...),
+		NumSendBlockPartMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_sending_blockpart_msgs_on_conreactor",
+			Help:      "Number of sending messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType")).With(labelsAndValues...),
+		NumReceiveBlockPartMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_receiving_blockpart_msgs_on_conreactor",
+			Help:      "Number of receiving messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType")).With(labelsAndValues...),
+		NumSendVoteMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_sending_vote_msgs_on_conreactor",
+			Help:      "Number of sending messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType")).With(labelsAndValues...),
+		NumReceiveVoteMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_receiving_vote_msgs_on_conreactor",
+			Help:      "Number of receiving messages per message type",
+		}, append(labels, "peer_id", "chID", "msgType")).With(labelsAndValues...),
+		NumSendVotesForHeightMessageOnConReactor: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "number_of_sending_voteforheight_msgs_on_conreactor",
+			Help:      "Number of sending messages per message type",
+		}, append(labels, "peer_id", "chID", "roundStepType", "msgType")).With(labelsAndValues...),
+		// ==========
 	}
 }
 
@@ -207,7 +331,7 @@ func NopMetrics() *Metrics {
 		ByzantineValidators:      discard.NewGauge(),
 		ByzantineValidatorsPower: discard.NewGauge(),
 
-		BlockIntervalSeconds: discard.NewHistogram(),
+		BlockIntervalSeconds: discard.NewGauge(),
 
 		NumTxs:          discard.NewGauge(),
 		BlockSizeBytes:  discard.NewGauge(),
@@ -216,5 +340,26 @@ func NopMetrics() *Metrics {
 		FastSyncing:     discard.NewGauge(),
 		StateSyncing:    discard.NewGauge(),
 		BlockParts:      discard.NewCounter(),
+		// mymemo
+		// mymemo
+		// ---- gossip protocol investigateion start----
+		NumBroadcastHasVoteMessageOnConReactor:       discard.NewGauge(),
+		NumReceiveHasVoteMessageOnConReactor:         discard.NewGauge(),
+		NumReceiveVoteSetMaj23MessageOnConReactor:    discard.NewGauge(),
+		NumSendVoteSetMaj23MessageOnConReactor:       discard.NewGauge(),
+		NumReceiveNewValidBlockMessageOnConReactor:   discard.NewGauge(),
+		NumBroadcastNewValidBlockMessageOnConReactor: discard.NewGauge(),
+		NumReceiveNewRoundStepMessageOnConReactor:    discard.NewGauge(),
+		NumBroadcastNewRoundStepMessageOnConReactor:  discard.NewGauge(),
+		NumReceiveProposalMessageOnConReactor:        discard.NewGauge(),
+		NumSendProposalMessageOnConReactor:           discard.NewGauge(),
+		NumReceiveProposalPOLMessageOnConReactor:     discard.NewGauge(),
+		NumSendProposalPOLMessageOnConReactor:        discard.NewGauge(),
+		NumReceiveBlockPartMessageOnConReactor:       discard.NewGauge(),
+		NumSendBlockPartMessageOnConReactor:          discard.NewGauge(),
+		NumReceiveVoteMessageOnConReactor:            discard.NewGauge(),
+		NumSendVoteMessageOnConReactor:               discard.NewGauge(),
+		NumSendVotesForHeightMessageOnConReactor:     discard.NewGauge(),
+		// ---- gossip protocol investigateion end----
 	}
 }
